@@ -1,4 +1,4 @@
-﻿import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../core/telegram/telegram_bot_service.dart';
 
@@ -30,7 +30,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
       final list = await bot.fetchAvailableFiles();
       setState(() => _files = list);
     } catch (e) {
-      setState(() => _status = 'Lỗi: $e');
+      setState(() => _status = 'Loi: $e');
     } finally {
       setState(() => _loading = false);
     }
@@ -39,7 +39,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
   Future<void> _downloadFile(Map<String, dynamic> doc) async {
     final folder = await FilePicker.platform.getDirectoryPath();
     if (folder == null) return;
-    setState(() => _status = 'Đang tải ${doc['file_name']}...');
+    setState(() => _status = 'Dang tai ${doc['file_name']}...');
     try {
       final bot = TelegramBotStorage(
         botToken: _tokenCtrl.text.trim(),
@@ -50,9 +50,9 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
         doc['file_name'] as String,
         folder,
       );
-      setState(() => _status = 'Đã lưu tại: $savedPath');
+      setState(() => _status = 'Da luu tai: $savedPath');
     } catch (e) {
-      setState(() => _status = 'Lỗi tải file: $e');
+      setState(() => _status = 'Loi tai file: $e');
     }
   }
 
@@ -75,7 +75,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
             TextField(
               controller: _chatIdCtrl,
               decoration: const InputDecoration(
-                labelText: 'Channel / Chat ID (tùy chọn)',
+                labelText: 'Channel / Chat ID (tuy chon)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -85,7 +85,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
               child: FilledButton.icon(
                 onPressed: _loading ? null : _fetchFiles,
                 icon: const Icon(Icons.sync),
-                label: Text(_loading ? 'Đang đồng bộ...' : 'Lấy danh sách file từ Telegram'),
+                label: Text(_loading ? 'Dang dong bo...' : 'Lay danh sach file tu Telegram'),
               ),
             ),
             if (_status != null) ...[

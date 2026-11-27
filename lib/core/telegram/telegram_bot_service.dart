@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -40,7 +40,7 @@ class TelegramBotStorage {
     final infoJson = jsonDecode(infoResp.body) as Map<String, dynamic>;
     final filePath = infoJson['result']?['file_path'] as String?;
     if (filePath == null) {
-      throw Exception('Không lấy được đường dẫn file từ Telegram.');
+      throw Exception('Khong lay duoc duong dan file tu Telegram.');
     }
 
     final downloadUrl = Uri.parse('https://api.telegram.org/file/bot$botToken/$filePath');
