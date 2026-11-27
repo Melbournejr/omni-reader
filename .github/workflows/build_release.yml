@@ -34,7 +34,7 @@ jobs:
           echo "org.gradle.kotlin.dsl.compileAvoidance=false" >> ~/.gradle/gradle.properties
       - run: flutter pub get
       - run: flutter build apk --release
-      - name: Rename Android APK to App Name and Version
+      - name: Package Android APK with App Name and Version
         run: |
           TAG_NAME="${{ github.event.inputs.release_tag }}"
           if [ -z "$TAG_NAME" ]; then
@@ -68,51 +68,32 @@ jobs:
         with:
           flutter-version: '3.27.4'
           channel: 'stable'
-      - name: Prepare Windows platform and build via detected VS generator
+      - name: Ensure Windows platform and configure CMake generator
         shell: pwsh
         run: |
           if (-not (Test-Path "windows")) { flutter create --platforms=windows --project-name omni_reader . }
-          flutter pub get
-
           $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $gen = "Visual Studio 17 2022"
-          $vsPath = $null
           if (Test-Path $vsWhere) {
             $ver = & $vsWhere -latest -property installationVersion
-            $vsPath = & $vsWhere -latest -property installationPath
             if ($ver -match "^18\.") { $gen = "Visual Studio 18 2026" }
           }
-
-          $buildDir = Join-Path (Get-Location) "build\windows\x64"
-          New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
-
-          $cmakeExe = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio","${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse -Filter "cmake.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $cmakeExe) {
-            $cmakeCmd = Get-Command cmake -ErrorAction SilentlyContinue
-            if ($cmakeCmd) { $cmakeExe = $cmakeCmd.Source }
+          $shimDir = Join-Path (Get-Location) "cmake-shim"
+          New-Item -ItemType Directory -Path $shimDir -Force | Out-Null
+          $realCmake = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio","${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse -Filter "cmake.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if ($realCmake) {
+            $lines = @(
+              "@echo off",
+              "setlocal enabledelayedexpansion",
+              "set ""ARGS=%*""",
+              "set ""ARGS=!ARGS:-G Visual Studio 16 2019=-G $gen!""",
+              """" + $realCmake + """ !ARGS!"
+            )
+            Set-Content -Path (Join-Path $shimDir "cmake.exe") -Value $lines -Encoding ASCII
+            Add-Content -Path $env:GITHUB_PATH -Value $shimDir
           }
-
-          $devCmd = $null
-          if ($vsPath) {
-            $candidateDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
-            if (Test-Path $candidateDevCmd) { $devCmd = $candidateDevCmd }
-          }
-
-          $sourceDir = Join-Path (Get-Location) "windows"
-          if ($devCmd -and $cmakeExe) {
-            $cmdScript = @"
-@echo off
-call "$devCmd" -arch=x64 -host_arch=x64
-"$cmakeExe" -S "$sourceDir" -B "$buildDir" -G "$gen" -A x64 -DFLUTTER_TARGET_PLATFORM=windows-x64
-"$cmakeExe" --build "$buildDir" --config Release --target omni_reader
-"@
-            $batFile = Join-Path (Get-Location) "run_win_build.bat"
-            Set-Content -Path $batFile -Value $cmdScript -Encoding ASCII
-            cmd /c "`"$batFile`""
-            if ($LASTEXITCODE -ne 0) { throw "CMake/MSBuild Windows failed with code $LASTEXITCODE" }
-          } else {
-            flutter build windows --release
-          }
+      - run: flutter pub get
+      - run: flutter build windows --release
       - name: Package Windows release with App Name and Version
         shell: pwsh
         run: |
