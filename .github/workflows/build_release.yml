@@ -43,11 +43,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.27.4'
           channel: 'stable'
-      - name: Ensure Windows platform and configure CMake generator
+      - name: Ensure Windows platform and set CMake generator
         shell: pwsh
         run: |
           if (-not (Test-Path "windows")) { flutter create --platforms=windows --project-name omni_reader . }
@@ -57,14 +58,7 @@ jobs:
             $ver = & $vsWhere -latest -property installationVersion
             if ($ver -match "^18\.") { $gen = "Visual Studio 18 2026" }
           }
-          $shimDir = Join-Path (Get-Location) "cmake-shim"
-          New-Item -ItemType Directory -Path $shimDir -Force | Out-Null
-          $realCmake = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio","${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse -Filter "cmake.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-          if ($realCmake) {
-            $bat = "@echo off`r`nsetlocal enabledelayedexpansion`r`nset `"ARGS=%*`"`r`nset `"ARGS=!ARGS:-G Visual Studio 16 2019=-G $gen!`"`r`n`"$realCmake`" !ARGS!"
-            Set-Content -Path (Join-Path $shimDir "cmake.exe") -Value $bat -Encoding ASCII
-            Add-Content -Path $env:GITHUB_PATH -Value $shimDir
-          }
+          "CMAKE_GENERATOR=$gen" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - run: flutter pub get
       - run: flutter build windows --release
       - name: Zip Windows Release
