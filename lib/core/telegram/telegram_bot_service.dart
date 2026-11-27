@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -9,15 +9,15 @@ class TelegramBotStorage {
 
   TelegramBotStorage({required this.botToken, required this.chatId});
 
-  Future<List>> fetchAvailableFiles() async {
-    final uri = Uri.parse('https://api.telegram.org/bot$botToken/getUpdates');
+  Future<List<Map<String, dynamic>>> fetchAvailableFiles() async {
+    final uri = Uri.parse('https://api.telegram.org/bot/getUpdates');
     final resp = await http.get(uri);
     if (resp.statusCode != 200) {
-      throw Exception('Telegram API error: ${resp.statusCode}');
+      throw Exception('Telegram API error: ');
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     final results = (data['result'] as List<dynamic>? ?? []);
-    final files = >[];
+    final files = <Map<String, dynamic>>[];
 
     for (final item in results) {
       final msg = item['channel_post'] ?? item['message'];
@@ -35,7 +35,7 @@ class TelegramBotStorage {
 
   Future<String> downloadToFolder(String fileId, String fileName, String targetFolder) async {
     final infoResp = await http.get(
-      Uri.parse('https://api.telegram.org/bot$botToken/getFile?file_id=$fileId'),
+      Uri.parse('https://api.telegram.org/bot/getFile?file_id='),
     );
     final infoJson = jsonDecode(infoResp.body) as Map<String, dynamic>;
     final filePath = infoJson['result']?['file_path'] as String?;
@@ -43,7 +43,7 @@ class TelegramBotStorage {
       throw Exception('Khong lay duoc duong dan file tu Telegram.');
     }
 
-    final downloadUrl = Uri.parse('https://api.telegram.org/file/bot$botToken/$filePath');
+    final downloadUrl = Uri.parse('https://api.telegram.org/file/bot/');
     final fileResp = await http.get(downloadUrl);
     final outPath = p.join(targetFolder, fileName);
     await File(outPath).writeAsBytes(fileResp.bodyBytes);

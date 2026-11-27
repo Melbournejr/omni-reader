@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+﻿import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../core/telegram/telegram_bot_service.dart';
 
@@ -12,7 +12,7 @@ class TelegramCloudScreen extends StatefulWidget {
 class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
   final _tokenCtrl = TextEditingController();
   final _chatIdCtrl = TextEditingController();
-  List> _files = [];
+  List<Map<String, dynamic>> _files = [];
   bool _loading = false;
   String? _status;
 
@@ -30,7 +30,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
       final list = await bot.fetchAvailableFiles();
       setState(() => _files = list);
     } catch (e) {
-      setState(() => _status = 'Loi: $e');
+      setState(() => _status = 'Loi: ');
     } finally {
       setState(() => _loading = false);
     }
@@ -39,7 +39,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
   Future<void> _downloadFile(Map<String, dynamic> doc) async {
     final folder = await FilePicker.platform.getDirectoryPath();
     if (folder == null) return;
-    setState(() => _status = 'Dang tai ${doc['file_name']}...');
+    setState(() => _status = 'Dang tai ...');
     try {
       final bot = TelegramBotStorage(
         botToken: _tokenCtrl.text.trim(),
@@ -50,9 +50,9 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
         doc['file_name'] as String,
         folder,
       );
-      setState(() => _status = 'Da luu tai: $savedPath');
+      setState(() => _status = 'Da luu tai: ');
     } catch (e) {
-      setState(() => _status = 'Loi tai file: $e');
+      setState(() => _status = 'Loi tai file: ');
     }
   }
 
@@ -101,7 +101,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
                   return ListTile(
                     leading: const Icon(Icons.insert_drive_file_outlined),
                     title: Text(f['file_name'] as String),
-                    subtitle: Text('${f['file_size']} bytes'),
+                    subtitle: Text(' bytes'),
                     trailing: IconButton(
                       icon: const Icon(Icons.download),
                       onPressed: () => _downloadFile(f),
