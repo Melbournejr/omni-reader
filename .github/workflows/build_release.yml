@@ -25,7 +25,8 @@ jobs:
             sed -i 's/gradle-[0-9.]*-all.zip/gradle-8.7-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
           fi
       - run: flutter pub get
-      - run: flutter build apk --release
+      - run: flutter analyze --no-fatal-infos || true
+      - run: flutter build apk --release --verbose
       - uses: actions/upload-artifact@v4
         with:
           name: omni-reader-android-apk
@@ -35,23 +36,20 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: microsoft/setup-msbuild@v2
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-      - name: Ensure Windows platform and use available VS generator
+      - name: Ensure Windows platform
+        run: if (-not (Test-Path "windows")) { flutter create --platforms=windows --project-name omni_reader . }
+        shell: pwsh
+      - name: Install VS 2022 build tools if VS 2019 generator is required
         run: |
-          if (-not (Test-Path "windows")) { flutter create --platforms=windows --project-name omni_reader . }
-          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          if (Test-Path $vsWhere) {
-            $vsVer = & $vsWhere -latest -property installationVersion
-            if ($vsVer -match "^18\.") { $env:CMAKE_GENERATOR = "Visual Studio 18 2026" }
-            elseif ($vsVer -match "^17\.") { $env:CMAKE_GENERATOR = "Visual Studio 17 2022" }
-          }
+          vswhere.exe -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          Get-ChildItem "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" | Out-Null
         shell: pwsh
       - run: flutter pub get
-      - run: flutter build windows --release
+      - run: flutter build windows --release --verbose
       - uses: actions/upload-artifact@v4
         with:
           name: omni-reader-windows-release
