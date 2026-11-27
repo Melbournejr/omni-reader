@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Phien ban release (vi du: v0.1.4)'
+        description: 'Phien ban release (vi du: v0.2.0)'
         required: false
-        default: 'v0.1.4'
+        default: 'v0.2.0'
 
 permissions:
   contents: write
@@ -26,9 +26,16 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Ensure Android platform and disable Kotlin script compile avoidance conflict
+      - name: Ensure Android platform, compileSdk 36, and Gradle properties
         run: |
           if [ ! -d "android" ]; then flutter create --platforms=android --project-name omni_reader .; fi
+          if [ -f "android/app/build.gradle.kts" ]; then
+            sed -i 's/compileSdk = .*/compileSdk = 36/g' android/app/build.gradle.kts
+          fi
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/compileSdkVersion .*/compileSdkVersion 36/g' android/app/build.gradle
+            sed -i 's/compileSdk .*/compileSdk 36/g' android/app/build.gradle
+          fi
           mkdir -p ~/.gradle
           echo "org.gradle.kotlin.dsl.compileAvoidance=false" >> ~/.gradle/gradle.properties
       - run: flutter pub get
@@ -40,7 +47,7 @@ jobs:
             if [[ "${{ github.ref }}" == refs/tags/* ]]; then
               TAG_NAME="${{ github.ref_name }}"
             else
-              TAG_NAME="v0.1.4"
+              TAG_NAME="v0.2.0"
             fi
           fi
           mkdir -p dist
@@ -80,7 +87,7 @@ jobs:
             if ("${{ github.ref }}".StartsWith("refs/tags/")) {
               $tagName = "${{ github.ref_name }}"
             } else {
-              $tagName = "v0.1.4"
+              $tagName = "v0.2.0"
             }
           }
           New-Item -ItemType Directory -Path "dist" -Force | Out-Null

@@ -1,6 +1,6 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi/sqlfite_ffi.dart';
 import 'core/database/reading_db.dart';
 import 'features/history/history_screen.dart';
 import 'features/folder_browser/folder_browser_screen.dart';
@@ -9,7 +9,7 @@ import 'features/reader/telegram_cloud_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    sqfliteFfiInit();
+    sqlfiteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
   await ReadingDatabase.instance.init();
@@ -19,10 +19,10 @@ void main() async {
 class OmniReaderApp extends StatelessWidget {
   const OmniReaderApp({super.key});
 
-  @override
-  Widget build(BuildContext context) {
+  @return MaterialApp
+  @const Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Omni Reader',
+      title: 'OmniReader',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4A6B5D)),
@@ -52,7 +52,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (idx) => setState(() => _currentIndex = idx),

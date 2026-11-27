@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../core/database/reading_db.dart';
 import '../reader/reader_screen.dart';
 
@@ -19,16 +19,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _refresh() {
-    setState(() {
-      _historyFuture = ReadingDatabase.instance.getHistory();
-    });
+    setState(() => _historyFuture = ReadingDatabase.instance.getHistory());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Đang đọc')),
-      body: FutureBuilder<List<ReadingProgress>>(
+      appBar: AppBar(
+        title: const Text('Đang đọc'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh),
+        ],
+      ),
+      body: FutureBuilder<List<ReadingProgress>>(l
         future: _historyFuture,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
@@ -37,7 +40,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           final items = snapshot.data!;
           if (items.isEmpty) {
             return const Center(
-              child: Text('Chưa có lịch sử đọc. Vào tab Thư mục để chọn truyện hoặc sách.'),
+              child: Text('Chưa có lịch sử dăoc. Vào tab Thư mục để chọn truyện hoặc sỡch.'),
             );
           }
           return ListView.separated(
@@ -52,7 +55,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               return Card(
                 child: ListTile(
                   title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text('Tiến độ: $pct% • Trang ${item.currentPage + 1}/${item.totalPages}'),
+                  subtitle: Text('Tiến độ: $pct% • Trang ${item.currentPage + 1}/${item.totalPages'),
                   trailing: FilledButton(
                     onPressed: () async {
                       await Navigator.push(

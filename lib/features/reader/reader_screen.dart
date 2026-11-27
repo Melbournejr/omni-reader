@@ -1,5 +1,6 @@
-ï»¿import 'dart:typed_data';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/database/reading_db.dart';
 import '../../core/file_engines/zero_clone_engine.dart';
 
@@ -20,10 +21,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
   List<String> _textPages = [];
   int _currentPage = 0;
   double _fontSize = 18.0;
+  double _lineHeight = 1.65;
+  String _fontFamily = 'default';
   String _bgTheme = 'paper';
-  String _readingDirection = 'ltr';
-  bool _showControls = false;
+  String _readingDirection = 'ltr'; // 'ltr', 'rtl', 'vertical'
+  bool _doublePage = false;
+  bool _showControls = true;
   late PageController _pageController;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -32,23 +37,39 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _initReader();
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  int get _stepSize => _doublePage ? 2 : 1;
+
+  int get _totalItems => _isComic ? _comicPages.length : _textPages.length;
+
+  int get _totalSpreads => _totalItems == 0 ? 1 : (_totalItems / _stepSize).ceil();
+
   Future<void> _initReader() async {
     final saved = await ReadingDatabase.instance.getProgress(widget.filePath);
     if (saved != null) {
       _currentPage = saved.currentPage;
       _fontSize = saved.fontSize;
+      _lineHeight = saved.lineHeight;
+      _fontFamily = saved.fontFamily;
       _bgTheme = saved.bgTheme;
       _readingDirection = saved.readingDirection;
+      _doublePage = saved.doublePage;
     }
 
-    if (ZeroCloneFileEngine.isComicArchive(widget.filePath)) {
+    if (ZeroCloneFileEngine.isComicContainer(widget.filePath)) {
       _isComic = true;
       _comicPages = await ZeroCloneFileEngine.loadComicPagesInMemory(widget.filePath);
       if (_currentPage >= _comicPages.length) _currentPage = 0;
     } else {
       _isComic = false;
       final raw = await ZeroCloneFileEngine.readTextFileDirect(widget.filePath);
-      const chunkSize = 1600;
+      const chunkSize = 1800;
       _textPages = [
         for (var i = 0; i < raw.length; i += chunkSize)
           raw.substring(i, i + chunkSize > raw.length ? raw.length : i + chunkSize),
@@ -57,25 +78,65 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (_currentPage >= _textPages.length) _currentPage = 0;
     }
 
-    _pageController = PageController(initialPage: _currentPage);
+    final initialSpread = (_currentPage / _stepSize).floor();
+    _pageController.dispose();
+    _pageController = PageController(initialPage: initialSpread);
     setState(() => _loading = false);
     await _saveProgress();
   }
 
   Future<void> _saveProgress() async {
-    final total = _isComic ? _comicPages.length : _textPages.length;
     await ReadingDatabase.instance.upsertProgress(
       ReadingProgress(
         filePath: widget.filePath,
         title: widget.title,
         currentPage: _currentPage,
-        totalPages: total == 0 ? 1 : total,
+        totalPages: _totalItems == 0 ? 1 : _totalItems,
         fontSize: _fontSize,
+        lineHeight: _lineHeight,
+        fontFamily: _fontFamily,
         bgTheme: _bgTheme,
         readingDirection: _readingDirection,
+        doublePage: _doublePage,
         lastOpened: DateTime.now(),
       ),
     );
+  }
+
+  void _goToSpread(int spreadIndex) {
+    final maxSpread = _totalSpreads - 1;
+    if (maxSpread < 0) return;
+    final target = spreadIndex.clamp(0, maxSpread);
+    if (_readingDirection != 'vertical' && _pageController.hasClients) {
+      _pageController.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    }
+    setState(() => _currentPage = target * _stepSize);
+    _saveProgress();
+  }
+
+  void _nextPage() {
+    final currentSpread = (_currentPage / _stepSize).floor();
+    _goToSpread(currentSpread + 1);
+  }
+
+  void _prevPage() {
+    final currentSpread = (_currentPage / _stepSize).floor();
+    _goToSpread(currentSpread - 1);
+  }
+
+  void _handleTap(TapDownDetails details, double width) {
+    final dx = details.localPosition.dx;
+    if (dx < width * 0.28) {
+      _readingDirection == 'rtl' ? _nextPage() : _prevPage();
+    } else if (dx > width * 0.72) {
+      _readingDirection == 'rtl' ? _prevPage() : _nextPage();
+    } else {
+      setState(() => _showControls = !_showControls);
+    }
   }
 
   Color _backgroundColor() {
@@ -84,127 +145,186 @@ class _ReaderScreenState extends State<ReaderScreen> {
         return const Color(0xFFF4ECD8);
       case 'gray':
         return const Color(0xFFE6E8EC);
-      case 'dark':
-        return const Color(0xFF141414);
-      default:
-        return const Color(0xFFFAF9F6);
-    }
-  }
+      cX\ÙH	Ù\šÉÎ‚ˆ™]\›ˆÛÛœİÛÛÜŠ‘ŒLŒLŒLŠNÂˆY˜][‚ˆ™]\›ˆÛÛœİÛÛÜŠ‘‘QQŠNÂˆBˆB‚ˆÛÛÜˆİ^ÛÛÜŠ
+HOˆØ™Õ[YHOH	Ù\šÉÈÈÛÛœİÛÛÜŠ‘‘L‘L‘LŠHˆÛÛœİÛÛÜŠ‘ŒQŒŒÌ
+NÂ‚ˆİš[™ÏÈÜ™\ÛÛ™Y›Û˜[Z[J
+HÂˆİÚ]Ú
+Ù›Û˜[Z[JHÂˆØ\ÙH	ÜÙ\šY‰Î‚ˆ™]\›ˆ	ÑÙ[Ü™ÚXIÎÂˆØ\ÙH	ÜØ[œÉÎ‚ˆ™]\›ˆ	Ğ\šX[	ÎÂˆØ\ÙH	Û[Û›ÉÎ‚ˆ™]\›ˆ	Û[Û›ÜÜXÙIÎÂˆY˜][‚ˆ™]\›ˆ[ÂˆBˆB‚ˆ›ÚYÛÜ[”Ù][™ÜÔÚY]
 
-  Color _textColor() => _bgTheme == 'dark' ? const Color(0xFFE2E2E2) : const Color(0xFF1F2328);
+HÂˆÚİÓ[Ù[›İÛTÚY]
+ˆÛÛ^ˆÛÛ^ˆ\ÔØÜ›ÛÛÛ›ÛYˆYKˆZ[\ˆ
+İ
+HOˆİ]Y[Z[\ŠˆZ[\ˆ
+İÙ]ÚY]İ]JHOˆY[™ÊˆY[™ÎˆÛÛœİYÙR[œÙ]Ë˜[
+MŠKˆÚ[ˆÛÛ[[ŠˆXZ[^\ÔÚ^™NˆXZ[^\ÔÚ^™K›Z[‹ˆÜ›ÜÜĞ^\Ğ[YÛ›Y[ˆÜ›ÜÜĞ^\Ğ[YÛ›Y[œİ\ˆÚ[™[ˆÂˆÛÛœİ^
+	ĞğèH1$xn­İ˜[™È1$xnãXÉËİ[Nˆ^İ[J›ÛÚ^™NˆN›ÛÙZYÚˆ›ÛÙZYÚ˜›Û
+JKˆÛÛœİÚ^™Y›Ş
+ZYÚˆLŠKˆÛÛœİ^
+	ĞÚxnà]H1$xnãXÉËİ[Nˆ^İ[J›ÛÙZYÚˆ›ÛÙZYÚÍŒ
+JKˆÜ˜\
+ˆÜXÚ[™ÎˆˆÚ[™[ˆÂˆÚÚXÙPÚ\
+ˆX™[ˆÛÛœİ^
+	Õ°èZHOˆ8n¨ÚH
+ŠIÊKˆÙ[XİYˆÜ™XY[™Ñ\™Xİ[ÛˆOH	Û‰ËˆÛ”Ù[XİYˆ
+ÊHÂˆÙ]İ]J
 
-  @override
-  Widget build(BuildContext context) {
-    final totalPages = _isComic ? _comicPages.length : _textPages.length;
+HOˆÜ™XY[™Ñ\™Xİ[ÛˆH	Û‰ÊNÂˆÙ]ÚY]İ]J
 
-    return Scaffold(
-      backgroundColor: _backgroundColor(),
-      appBar: _showControls
-          ? AppBar(
-              title: Text(widget.title),
-              actions: [
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.swap_horiz),
-                  tooltip: 'Chiá»u Ä‘á»c',
-                  onSelected: (val) {
-                    setState(() => _readingDirection = val);
-                    _saveProgress();
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'ltr', child: Text('TrÃ¡i sang Pháº£i (LTR)')),
-                    PopupMenuItem(value: 'rtl', child: Text('Pháº£i sang TrÃ¡i (Manga Nháº­t)')),
-                  ],
-                ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.palette_outlined),
-                  tooltip: 'MÃ u ná»n trang giáº¥y',
-                  onSelected: (val) {
-                    setState(() => _bgTheme = val);
-                    _saveProgress();
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'paper', child: Text('Giáº¥y tráº¯ng dá»‹u')),
-                    PopupMenuItem(value: 'sepia', child: Text('VÃ ng giáº¥y cÅ©')),
-                    PopupMenuItem(value: 'gray', child: Text('XÃ¡m nháº¡t')),
-                    PopupMenuItem(value: 'dark', child: Text('Ná»n tá»‘i')),
-                  ],
-                ),
-              ],
-            )
-          : null,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : GestureDetector(
-              onTap: () => setState(() => _showControls = !_showControls),
-              child: PageView.builder(
-                controller: _pageController,
-                reverse: _readingDirection == 'rtl',
-                itemCount: totalPages,
-                onPageChanged: (idx) {
-                  setState(() => _currentPage = idx);
-                  _saveProgress();
-                },
-                itemBuilder: (context, idx) {
-                  if (_isComic) {
-                    return Center(
-                      child: InteractiveViewer(
-                        child: Image.memory(_comicPages[idx], fit: BoxFit.contain),
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        _textPages[idx],
-                        style: TextStyle(
-                          fontSize: _fontSize,
-                          height: 1.55,
-                          color: _textColor(),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-      bottomNavigationBar: _showControls && totalPages > 0
-          ? BottomAppBar(
-              child: Row(
-                children: [
-                  Text('${_currentPage + 1} / $totalPages'),
-                  Expanded(
-                    child: Slider(
-                      value: _currentPage.toDouble().clamp(0, (totalPages - 1).toDouble()),
-                      max: (totalPages - 1) > 0 ? (totalPages - 1).toDouble() : 1,
-                      onChanged: (v) {
-                        final target = v.round();
-                        _pageController.jumpToPage(target);
-                        setState(() => _currentPage = target);
+HOˆßJNÂˆÜØ]™T›ÙÜ™\ÜÊ
+NÂˆKˆ
+KˆÚÚXÙPÚ\
+ˆX™[ˆÛÛœİ^
+	Ô8n¨ÚHOˆ°èZH
+X[™ØJIÊKˆÙ[XİYˆÜ™XY[™Ñ\™Xİ[ÛˆOH	Ü	ËˆÛ”Ù[XİYˆ
+ÊHÂˆÙ]İ]J
+
+HOˆÜ™XY[™Ñ\™Xİ[ÛˆH	Ü	ÊNÂˆÙ]ÚY]İ]J
+
+HOˆßJNÂˆÜØ]™T›ÙÜ™\ÜÊ
+NÂˆKˆ
+KˆÚÚXÙPÚ\
+ˆX™[ˆÛÛœİ^
+	Ğİxnæ[ˆ8nãXÉÊKˆÙ[XİYˆÜ™XY[™Ñ\™Xİ[ÛˆOH	İ™\XØ[	ËˆÛ”Ù[XİYˆ
+ÊHÂˆÙ]İ]J
+
+HOˆÜ™XY[™Ñ\™Xİ[ÛˆH	İ™\XØ[	ÊNÂˆÙ]ÚY]İ]J
+
+HOˆßJNÂˆÜØ]™T›ÙÜ™\ÜÊ
+NÂˆKˆ
+KˆKˆ
+KˆÛÛœİÚ^™Y›Ş
+ZYÚˆLŠKˆÛÛœİ^
+	Ğ¸näH[È˜[™ÉËİ[Nˆ^İ[J›ÛÙZYÚˆ›ÛÙZYÚÍŒ
+JKˆÜ˜\
+ˆÜXÚ[™ÎˆˆÚ[™[ˆÂˆÚÚXÙPÚ\
+ˆX™[ˆÛÛœİ^
+	ÌH˜[™È1$q¨[‰ÊKˆÙ[XİYˆWÙİX›TYÙKˆÛ”Ù[XİYˆ
+ÊHÂˆÙ]İ]J
+
+HOˆÙİX›TYÙHH˜[ÙJNÂˆÙ]ÚY]İ]J
+
+HOˆßJNÂˆÜØ]™T›ÙÜ™\ÜÊ
+NÂˆKˆ
+KˆÚÚXÙPÚ\
+ˆX™[ˆÛÛœİ^
+	Ìˆ˜[™È1$píIÊKˆÙ[XİYˆÙİX›TYÙKˆÛ”Ù[XİYˆ
+ÊHÂˆÙ]İ]J
+
+HOˆÙİX›TYÙHHYJNÂˆÙ]ÚY]İ]J
+
+HOˆßJNÂˆÜØ]™T›ÙÜ™\ÜÊ
+NÂˆKˆ
+KˆKˆ
+KˆÛÛœİÚ^™Y›Ş
+ZYÚˆLŠKˆÛÛœİ^
+	ÓpèH¸nà[ˆ˜[™ÈÚxn©^IËİ[Nˆ^İ[J›ÛÙZYÚˆ›ÛÙZYÚÍŒ
+JKˆÜ˜\
+ˆÜXÚ[™ÎˆˆÚ[™[ˆÂˆ›Üˆ
+š[˜[[ˆÂˆÉÜ\\‰Ë	ÑÚxn©^H¸n«Û™É×KˆÉÜÙ\XIË	Õ°è™ÈÚyáº¥y cÅ©'],
+                    ['gray', 'XÃ¡m dá»‹u'],
+                    ['dark', 'Ná»n tá»‘i'],
+                  ])
+                    ChoiceChip(
+                      label: Text(t[1]),
+                      selected: _bgTheme == t[0],
+                      onSelected: (_) {
+                        setState(() => _bgTheme = t[0]);
+                        setSheetState(() => {});
                         _saveProgress();
                       },
                     ),
-                  ),
-                  if (!_isComic) ...[
-                    IconButton(
-                      icon: const Icon(Icons.text_decrease),
-                      onPressed: () {
-                        setState(() => _fontSize = (_fontSize - 1).clamp(13, 36));
-                        _saveProgress();
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.text_increase),
-                      onPressed: () {
-                        setState(() => _fontSize = (_fontSize + 1).clamp(13, 36));
-                        _saveProgress();
-                      },
-                    ),
-                  ],
                 ],
               ),
-            )
-          : null,
+              if (!_isComic) ...[
+                const SizedBox(height: 12),
+                const Text('PhÃ´ng chá»¯', style: TextStyle(fontWeight: FontWeight.w600)),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final f in [
+                      ['default', 'Máº·c Ä‘á»‹nh'],
+                      ['serif', 'Serif (SÃ¡ch giáº¥y)'],
+                      ['sans', 'Sans-Serif'],
+                      ['mono', 'Monospace'],
+                    ])
+                      ChoiceChip(
+                        label: Text(f[1]),
+                        selected: _fontFamily == f[0],
+                        onSelected: (_) {
+                          setState(() => _fontFamily = f[0]);
+                          setSheetState(() => {});
+                          _saveProgress();
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text('Cá»¡ chá»¯: ${_fontSize.toStringAsFixed(0)}pt'),
+                Slider(
+                  value: _fontSize,
+                  min: 13,
+                  max: 36,
+                  onChanged: (v) {
+                    setState(() => _fontSize = v);
+                    setSheetState(() => {});
+                    _saveProgress();
+                  },
+                ),
+                Text('GiÃ£n dÃ²ng: ${_lineHeight.toStringAsFixed(1)}',
+                Slider(
+                  value: _lineHeight,
+                  min: 1.2,
+                  max: 2.2,
+                  onChanged: (v) {
+                    setState(() => _lineHeight = v);
+                    setSheetState(() => {});
+                    _saveProgress();
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
-}
+
+  Widget _buildSingleItem(int index) {
+    if (_isComic) {
+      return InteractiveViewer(
+        minScale: 1.0,
+        maxScale: 4.0,
+        child: Center(child: Image.memory(_comicPages[index], fit: BoxFit.contain)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: SingleChildScrollView(
+        child: Text(
+          _textPages[index],
+          style: TextStyle(
+            fontSize: _fontSize,
+            height: _lineHeight,
+            fontFamily: _resolvedFontFamily(),
+            color: _textColor(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpread(int spreadIndex) {
+    if (!_doublePage) {
+      return _buildSingleItem(spreadIndex);
+    }
+    final first = spreadIndex * 2;
+    final second = first + 1;
+    final hasSecond = second < _totalItems;
+    final leftIdx = _readingDirection == 'rtl' ? (hasSecond ? second : first) : first;
+    final rightIdx = _readingDirection == 'rtl' ? (hasSecond ? first : null) : (hasSecond ? second : null);
+
+    return Row(
+      children: [
+        Expanded(child: _buildSingleItem(leftIdx)),
+        const VerticalDivider(width: 1),
+        Expanded(child: rightIdx „ô¹Õ±°€ü}‰Õ¥±‘M¥¹±•%Ñ•´¡É¥¡Ñ%‘à¤€è½¹ÍĞM¥é•‘	½à¹Í¡É¥¹¬ ¤¤°(€€€€€t°(€€€€¤ì(€ô((€½Ù•ÉÉ¥‘”(€]¥‘•Ğ‰Õ¥±¡	Õ¥±‘½¹Ñ•áĞ½¹Ñ•áĞ¤ì(€€€™¥¹…°ÕÉÉ•¹ÑMÁÉ•…€ô€¡}ÕÉÉ•¹ÑA…”€¼}ÍÑ•ÁM¥é”¤¹™±½½È ¤¹±…µÀ À°}Ñ½Ñ…±MÁÉ•…‘Ì€´€Ä¤ì((€€€É•ÑÕÉ¸-•å‰½…É‘1¥ÍÑ•¹•È (€€€€€™½ÕÍ9½‘”è}™½ÕÍ9½‘”°(€€€€€…ÕÑ½™½ÕÌèÑÉÕ”°(€€€€€½¹-•åÙ•¹Ğè€¡•Ù•¹Ğ¤ì(€€€€€€€¥˜€¡•Ù•¹Ğ¥Ì-•å½İ¹Ù•¹Ğ¤ì(€€€€€€€€€™¥¹…°¬€ô•Ù•¹Ğ¹±½¥…±-•äì(€€€€€€€€€¥˜€¡¬€ôô1½¥…±-•å‰½…É‘-•ä¹…ÉÉ½İI¥¡Ğñğ¬€ôô1½¥…±-•å‰½…É‘-•ä¹ÍÁ…”ñğ¬€ôô1½¥…±-•å‰½…É‘-•ä¹Á…•½İ¸¤ì(€€€€€€€€€€€}É•…‘¥¹¥É•Ñ¥½¸€ôô€ÉÑ°œ€ü}ÁÉ•ÙA…” ¤€è}¹•áÑA…” ¤ì(€€€€€€€€€ô•±Í”¥˜€¡¬€ôô1½¥…±-•å‰½…É‘-•ä¹…ÉÉ½İ1•™Ğñğ¬€ôô1½¥…±-•å‰½…É‘-•ä¹Á…•UÀ¤ì(€€€€€€€€€€€}É•…‘¥¹¥É•Ñ¥½¸€ôô€ÉÑ°œ€ü}¹•áÑA…” ¤€è}ÁÉ•ÙA…” ¤ì(€€€€€€€€€ô(€€€€€€€ô(€€€€€ô°(€€€€€¡¥±èM…™™½± (€€€€€€€‰…­É½Õ¹‘½±½Èè}‰…­É½Õ¹‘½±½È ¤°(€€€€€€€…ÁÁ	…Èè}Í¡½İ½¹ÑÉ½±Ì(€€€€€€€€€€€€üÁÁ	…È (€€€€€€€€€€€€€€€Ñ¥Ñ±”èQ•áĞ¡İ¥‘•Ğ¹Ñ¥Ñ±”¤°(€€€€€€€€€€€€€€€…Ñ¥½¹Ìèl(€€€€€€€€€€€€€€€€€%½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€¥½¸è%½¸¡}‘½Õ‰±•A…”€ü%½¹Ì¹¡½Ù¥•İ}…•¹‘…}½ÕÑ±¥¹•€è%½¹Ì¹¡É½µ•}É•…‘•É}µ½‘”¤°(€€€€€€€€€€€€€€€€€€€Ñ½½±Ñ¥Àè}‘½Õ‰±•A…”€ü€¡¥•Ô€ÄÑÉ…¹œœ€è€¡¥•Ô€ÈÑÉ…¹œ‘½¤œ°(€€€€€€€€€€€€€€€€€€€½¹AÉ•ÍÍ•è€ ¤ì(€€€€€€€€€€€€€€€€€€€€€Í•ÑMÑ…Ñ”  ¤€ôø}‘½Õ‰±•A…”€ô€…}‘½Õ‰±•A…”¤ì(€€€€€€€€€€€€€€€€€€€€€}Í…Ù•AÉ½É•ÍÌ ¤ì(€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€%½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€¥½¸è½¹ÍĞ%½¸¡%½¹Ì¹ÑÕ¹”¤°(€€€€€€€€€€€€€€€€€€€Ñ½½±Ñ¥Àè€¤ƒG†êİĞ™½¹Ğ£†î¼°·Ô»†î¸°¡§†îÔƒG†î5Œœ°(€€€€€€€€€€€€€€€€€€€½¹AÉ•ÍÍ•è}½Á•¹M•ÑÑ¥¹ÍM¡••Ğ°(€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€t°(€€€€€€€€€€€€€€¤(€€€€€€€€€€€€è¹Õ±°°(€€€€€€€‰½‘äè}±½…‘¥¹œ(€€€€€€€€€€€€ü½¹ÍĞ•¹Ñ•È¡¡¥±è¥ÉÕ±…ÉAÉ½É•ÍÍ%¹‘¥…Ñ½È ¤¤(€€€€€€€€€€€€è1…å½ÕÑ	Õ¥±‘•È (€€€€€€€€€€€€€‰Õ¥±‘•Èè€¡½¹Ñ•áĞ°½¹ÍÑÉ…¥¹ÑÌ¤€ôø•ÍÑÕÉ••Ñ•Ñ½È (€€€€€€€€€€€€€€€‰•¡…Ù¥½Èè!¥ÑQ•ÍÑ	•¡…Ù¥½È¹½Á…ÅÕ”°(€€€€€€€€€€€€€€€½¹…µ…•Q…Á½İ¸è¹Õ±°°(€€€€€€€€€€€€€€€½µQ…Á½İ¸è€¡‘•Ñ…¥±Ì¤€ôø}¡…¹‘±•Q…À¡‘•Ñ…¥±Ì°½¹ÍÑÉ…¥¹ÑÌ¹µ…á]¥‘Ñ ¤°(€€€€€€€€€€€€€€€¡¥±è}É•…‘¥¹¥É•Ñ¥½¸€ôô€Ù•ÉÑ¥…°œ(€€€€€€€€€€€€€€€€€€€€ü1¥ÍÑY¥•Ü¹‰Õ¥±‘•È (€€€€€€€€€€€€€€€€€€€€€€€¥Ñ•µ½Õ¹Ğè}Ñ½Ñ…±%Ñ•µÌ°(€€€€€€€€€€€€€€€€€€€€€€€¥Ñ•µ	Õ¥±‘•Èè€¡Ñà°¥‘à¤€ôø}‰Õ¥±‘M¥¹±•%Ñ•´¡¥‘à¤°(€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€èA…•Y¥•Ü¹‰Õ¥±‘•È (€€€€€€€€€€€€€€€€€€€€€€€½¹ÑÉ½±±•Èè}Á…•½¹ÑÉ½±±•È°(€€€€€€€€€€€€€€€€€€€€€€€É•Ù•ÉÍ”è}É•…‘¥¹¥É•Ñ¥½¸€ôô€ÉÑ°œ°(€€€€€€€€€€€€€€€€€€€€€€€¥Ñ•µ½Õ¹Ğè}Ñ½Ñ…±MÁÉ•…‘Ì°(€€€€€€€€€€€€€€€€€€€€€€€½¹A…•¡…¹•è€¡ÍÁÉ•…‘%‘à¥ôì(€€€€€€€€€€€€€€€€€€€€€€€€€Í•ÑMÑ…Ñ”  ¤€ôø}ÕÉÉ•¹ÑA…”€ôÍÁÉ•…‘%‘à€¨}ÍÑ•ÁM¥é”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€}Í…Ù•AÉ½É•ÍÌ ¤ì(€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€¥Ñ•µ	Õ¥±‘•Èè€¡Ñà°ÍÁÉ•…‘%‘à¤€ôø}‰Õ¥±‘MÁÉ•…¡ÍÁÉ•…‘%‘à¤°(€€€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€ô°(€€€€€€€€€€€€¤°(€€€€€€€‰½ÑÑ½µ9…Ù¥…Ñ¥½¹	…Èè}Í¡½İ½¹ÑÉ½±Ì€˜˜}Ñ½Ñ…±%Ñ•µÌ€ø€À(€€€€€€€€€€€€ü	½ÑÑ½µÁÁ	…È (€€€€€€€€€€€€€€€¡¥±èI½Ü (€€€€€€€€€€€€€€€€€¡¥±‘É•¸èl(€€€€€€€€€€€€€€€€€€€%½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€€€¥½¸è½¹ÍĞ%½¸¡%½¹Ì¹¡•ÙÉ½¹}±•™Ğ¤°(€€€€€€€€€€€€€€€€€€€€€½¹AÉ•ÍÍ•è}É•…‘¥¹¥É•Ñ¥½¸€ôô€ÉÑ°œ€ü}¹•áÑA…”€è}ÁÉ•ÙA…”°(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€Q•áĞ œ‘í}ÕÉÉ•¹ÑA…”€¬€Åô€¼€‘}Ñ½Ñ…±%Ñ•µÌœ¤°(€€€€€€€€€€€€€€€€€€€áÁ…¹‘• (€€€€€€€€€€€€€€€€€€€€€¡¥±èM±¥‘•È (€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”èÕÉÉ•¹ÑMÁÉ•…¹Ñ½½Õ‰±” ¤°(€€€€€€€€€€€€€€€€€€€€€€€µ…àè€¡}Ñ½Ñ…±MÁÉ•…‘Ì€´€Ä¤€ø€À€ü€¡}Ñ½Ñ…±MÁÉ•…‘Ì€´€Ä¤¹Ñ½½Õ‰±” ¤€è€Ä°(€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹•è€¡Ø¤€ôø}½Q½MÁÉ•…¡Ø¹É½Õ¹ ¤¤°(€€€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€%½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€€€¥½¸è½¹ÍĞ%½¸¡%½¹Ì¹¡•ÙÉ½¹}É¥¡Ğ¤°(€€€€€€€€€€€€€€€€€€€€€½¹AÉ•ÍÍ•è}É•…‘¥¹¥É•Ñ¥½¸€ôô€ÉÑ°œ€ü}ÁÉ•ÙA…”€è}¹•áÑA…”°(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€%½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€€€¥½¸è½¹ÍĞ%½¸¡%½¹Ì¹Í•ÑÑ¥¹Í}½ÕÑ±¥¹•¤°(€€€€€€€€€€€€€€€€€€€€€½¹AÉ•ÍÍ•è}½Á•¹M•ÑÑ¥¹ÍM¡••Ğ°(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€t°(€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€¤(€€€€€€€€€€€€è¹Õ±°°(€€€€€€¤°(€€€€¤ì(€ô)

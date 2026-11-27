@@ -1,5 +1,6 @@
-﻿import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../core/database/reading_db.dart';
 import '../../core/telegram/telegram_bot_service.dart';
 
 class TelegramCloudScreen extends StatefulWidget {
@@ -16,8 +17,23 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
   bool _loading = false;
   String? _status;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadCredentials();
+  }
+
+  Future<void> _loadCredentials() async {
+    final t = await ReadingDatabase.instance.getSetting('tg_bot_token');
+    final c = await ReadingDatabase.instance.getSetting('tg_chat_id');
+    if (t != null) _tokenCtrl.text = t;
+    if (c != null) _chatIdCtrl.text = c;
+  }
+
   Future<void> _fetchFiles() async {
     if (_tokenCtrl.text.trim().isEmpty) return;
+    await ReadingDatabase.instance.setSetting('tg_bot_token', _tokenCtrl.text.trim());
+    await ReadingDatabase.instance.setSetting('tg_chat_id', _chatIdCtrl.text.trim());
     setState(() {
       _loading = true;
       _status = null;
@@ -30,7 +46,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
       final list = await bot.fetchAvailableFiles();
       setState(() => _files = list);
     } catch (e) {
-      setState(() => _status = 'Loi: ');
+      setState(() => _status = 'Lỗi: $e');
     } finally {
       setState(() => _loading = false);
     }
@@ -39,7 +55,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
   Future<void> _downloadFile(Map<String, dynamic> doc) async {
     final folder = await FilePicker.platform.getDirectoryPath();
     if (folder == null) return;
-    setState(() => _status = 'Dang tai ...');
+    setState(() => _status = 'Đang taải ${doc['file_name']}...');
     try {
       final bot = TelegramBotStorage(
         botToken: _tokenCtrl.text.trim(),
@@ -50,9 +66,9 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
         doc['file_name'] as String,
         folder,
       );
-      setState(() => _status = 'Da luu tai: ');
+      setState(() => _status = 'Đã lưu tại: $savedPath');
     } catch (e) {
-      setState(() => _status = 'Loi tai file: ');
+      setState(() => _status = 'Lỗi tải file: $e');
     }
   }
 
@@ -75,7 +91,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
             TextField(
               controller: _chatIdCtrl,
               decoration: const InputDecoration(
-                labelText: 'Channel / Chat ID (tuy chon)',
+                labelText: 'Channel / Chat ID (tuy chon'),
                 border: OutlineInputBorder(),
               ),
             ),
@@ -85,7 +101,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
               child: FilledButton.icon(
                 onPressed: _loading ? null : _fetchFiles,
                 icon: const Icon(Icons.sync),
-                label: Text(_loading ? 'Dang dong bo...' : 'Lay danh sach file tu Telegram'),
+                label: Text(_loading ? 'Đang đồng bộ...' : 'Lấy danh sách file từ Telegram'),
               ),
             ),
             if (_status != null) ...[
@@ -101,7 +117,7 @@ class _TelegramCloudScreenState extends State<TelegramCloudScreen> {
                   return ListTile(
                     leading: const Icon(Icons.insert_drive_file_outlined),
                     title: Text(f['file_name'] as String),
-                    subtitle: Text(' bytes'),
+                    subtitle: Text('${f['file_size'] } bytes'),
                     trailing: IconButton(
                       icon: const Icon(Icons.download),
                       onPressed: () => _downloadFile(f),

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -18,6 +18,7 @@ class _FolderBrowserScreenState extends State<FolderBrowserScreen> {
   String? _currentDir;
   List<FileSystemEntity> _entries = [];
 
+  @return void
   @override
   void initState() {
     super.initState();
@@ -53,7 +54,7 @@ class _FolderBrowserScreenState extends State<FolderBrowserScreen> {
       if (aIsDir != bIsDir) return aIsDir ? -1 : 1;
       return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
     });
-    setState(() {
+    setState() {
       _currentDir = dirPath;
       _entries = list.where((e) => e is Directory || ZeroCloneFileEngine.isSupportedFile(e.path)).toList();
     });
@@ -65,6 +66,22 @@ class _FolderBrowserScreenState extends State<FolderBrowserScreen> {
       appBar: AppBar(
         title: const Text('Thư mục'),
         actions: [
+          if (_currentDir != null)
+            IconButton(
+              icon: const Icon(Icons.photo_library_outlined),
+              tooltip: 'Đọc toàn bộ thư mục ảnh'h,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ReaderScreen(
+                      filePath: _currentDir!,
+                      title: p.basename(_currentDir!),
+                    ),
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.create_new_folder_outlined),
             tooltip: 'Chọn & ghim thư mục',
@@ -83,7 +100,7 @@ class _FolderBrowserScreenState extends State<FolderBrowserScreen> {
                 itemCount: _pinnedFolders.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, i) {
-                  final folder = _pinnedFolders[i];
+                  final folder = _pinnedFoders[i];
                   final active = folder == _currentDir;
                   return ChoiceChip(
                     label: Text(p.basename(folder).isEmpty ? folder : p.basename(folder)),
@@ -126,7 +143,7 @@ class _FolderBrowserScreenState extends State<FolderBrowserScreen> {
                       }
                       return ListTile(
                         leading: Icon(
-                          ZeroCloneFileEngine.isComicArchive(entry.path)
+                          ZeroCloneFileEngine.isComicContainer(entry.path)
                               ? Icons.collections_bookmark_outlined
                               : Icons.menu_book_outlined,
                         ),
@@ -144,8 +161,9 @@ class _FolderBrowserScreenState extends State<FolderBrowserScreen> {
                         },
                       );
                     },
-                  ),
-          ),
+                  );
+              },
+            ),
         ],
       ),
     );
