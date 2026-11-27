@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Phien ban release (vi du: v0.2.0)'
+        description: 'Release tag (e.g. v1.0.0)'
         required: false
-        default: 'v0.2.0'
+        default: 'v1.0.0'
 
 permissions:
   contents: write
@@ -26,9 +26,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Ensure Android platform, compileSdk 36, and Gradle properties
+      - name: Generate Android project & set compileSdk 36
         run: |
-          if [ ! -d "android" ]; then flutter create --platforms=android --project-name omni_reader .; fi
+          flutter create --platforms=android --project-name omni_reader .
           if [ -f "android/app/build.gradle.kts" ]; then
             sed -i 's/compileSdk = .*/compileSdk = 36/g' android/app/build.gradle.kts
           fi
@@ -40,14 +40,14 @@ jobs:
           echo "org.gradle.kotlin.dsl.compileAvoidance=false" >> ~/.gradle/gradle.properties
       - run: flutter pub get
       - run: flutter build apk --release
-      - name: Package Android APK with App Name and Version
+      - name: Package Android APK
         run: |
           TAG_NAME="${{ github.event.inputs.release_tag }}"
           if [ -z "$TAG_NAME" ]; then
             if [[ "${{ github.ref }}" == refs/tags/* ]]; then
               TAG_NAME="${{ github.ref_name }}"
             else
-              TAG_NAME="v0.2.0"
+              TAG_NAME="v1.0.0"
             fi
           fi
           mkdir -p dist
@@ -73,13 +73,12 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Ensure Windows platform
+      - name: Generate Windows project
         shell: pwsh
-        run: |
-          if (-not (Test-Path "windows")) { flutter create --platforms=windows --project-name omni_reader . }
+        run: flutter create --platforms=windows --project-name omni_reader .
       - run: flutter pub get
       - run: flutter build windows --release
-      - name: Package Windows release with App Name and Version
+      - name: Package Windows Release
         shell: pwsh
         run: |
           $tagName = "${{ github.event.inputs.release_tag }}"
@@ -87,7 +86,7 @@ jobs:
             if ("${{ github.ref }}".StartsWith("refs/tags/")) {
               $tagName = "${{ github.ref_name }}"
             } else {
-              $tagName = "v0.2.0"
+              $tagName = "v1.0.0"
             }
           }
           New-Item -ItemType Directory -Path "dist" -Force | Out-Null
